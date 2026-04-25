@@ -2,6 +2,8 @@ import arcade
 from src.constants import *
 from src.models.enemy import Enemy
 from src.models.enemy_factory import EnemyFactory
+from src.models.powerup import PowerUp
+from src.models.powerup_factory import PowerUpFactory
 from src.core.save_service import SaveService
 from src.core.settings_service import SettingsService
 
@@ -30,6 +32,8 @@ class Player:
         self.center_y = SCREEN_HEIGHT - 100
         self.speed = PLAYER_SPEED
         self.health = PLAYER_MAX_HEALTH
+        self.shield = 0
+        self.bullet_level = 1
 
     def move(self, dx, dy):
         self.center_x += dx * self.speed
@@ -38,6 +42,9 @@ class Player:
         self.center_y = max(20, min(SCREEN_HEIGHT - 20, self.center_y))
 
     def take_damage(self):
+        if self.shield > 0:
+            self.shield -= 1
+            return False
         self.health -= 1
         return self.health <= 0
 
@@ -45,6 +52,8 @@ class Player:
         self.center_x = SCREEN_WIDTH // 2
         self.center_y = SCREEN_HEIGHT - 100
         self.health = PLAYER_MAX_HEALTH
+        self.shield = 0
+        self.bullet_level = 1
 
 
 class GameScene(arcade.View):
@@ -54,11 +63,14 @@ class GameScene(arcade.View):
         self.level = 1
         self.game_over = False
         self.hit_flash = 0
+        self.powerup_message = ''
+        self.powerup_timer = 0
 
         self.player = None
         self.bullet_list = []
         self.enemy_list = None
         self.enemy_factory = None
+        self.powerup_list = []
         self.bullet_cooldown = 0
 
         self.keys_pressed = set()
@@ -69,12 +81,15 @@ class GameScene(arcade.View):
         self.level = 1
         self.game_over = False
         self.hit_flash = 0
+        self.powerup_message = ''
+        self.powerup_timer = 0
 
         self.player = Player()
         self.bullet_list = []
         self.enemy_list = arcade.SpriteList()
         self.enemy_factory = EnemyFactory()
         self.enemy_factory.spawn_interval = settings.get('enemy_spawn_interval', ENEMY_SPAWN_INTERVAL)
+        self.powerup_list = []
         self.bullet_cooldown = 0
 
     def load_state(self, data):
@@ -83,16 +98,21 @@ class GameScene(arcade.View):
         self.level = data.get('level', 1)
         self.game_over = False
         self.hit_flash = 0
+        self.powerup_message = ''
+        self.powerup_timer = 0
 
         self.player = Player()
         self.player.center_x = data.get('player_x', SCREEN_WIDTH // 2)
         self.player.center_y = data.get('player_y', SCREEN_HEIGHT - 100)
         self.player.health = data.get('health', PLAYER_MAX_HEALTH)
+        self.player.shield = data.get('shield', 0)
+        self.player.bullet_level = data.get('bullet_level', 1)
 
         self.bullet_list = []
         self.enemy_list = arcade.SpriteList()
         self.enemy_factory = EnemyFactory()
         self.enemy_factory.spawn_interval = settings.get('enemy_spawn_interval', ENEMY_SPAWN_INTERVAL)
+        self.powerup_list = []
         self.bullet_cooldown = 0
 
     def save_state(self):
@@ -101,7 +121,9 @@ class GameScene(arcade.View):
             'level': self.level,
             'player_x': self.player.center_x,
             'player_y': self.player.center_y,
-            'health': self.player.health
+            'health': self.player.health,
+            'shield': self.player.shield,
+            'bullet_level': self.player.bullet_level
         }
 
     def on_update(self, delta_time):
@@ -111,12 +133,17 @@ class GameScene(arcade.View):
         self.handle_input()
         self.update_bullets()
         self.update_enemies()
+        self.update_powerups()
         self.spawn_enemies(delta_time)
         self.check_collisions()
         self.check_level_up()
 
         if self.hit_flash > 0:
             self.hit_flash -= delta_time
+        if self.powerup_timer > 0:
+            self.powerup_timer -= delta_time
+            if self.powerup_timer <= 0:
+                self.powerup_message = ''
 
         if SaveService.has_save():
             SaveService.save(self.save_state())
@@ -140,7 +167,7 @@ class GameScene(arcade.View):
             self.shoot()
 
     def shoot(self):
-        self.bullet_cooldown = BULLET_COOLDOWN
+        self.bullet_cooldown = BULLET_COOLDOWN / self.player.bullet_level
         bullet = Bullet(self.player.center_x, self.player.center_y + 20)
         self.bullet_list.append(bullet)
 
@@ -151,6 +178,11 @@ class GameScene(arcade.View):
 
     def update_enemies(self):
         self.enemy_list.update()
+
+    def update_powerups(self):
+        for powerup in self.powerup_list:
+            powerup.update()
+        self.powerup_list = [p for p in self.powerup_list if p.active]
 
     def spawn_enemies(self, delta_time):
         enemy = self.enemy_factory.update(delta_time)
@@ -181,6 +213,9 @@ class GameScene(arcade.View):
 
         for enemy in enemies_to_remove:
             enemy.kill()
+            powerup = PowerUpFactory.maybe_create(enemy.center_x, enemy.center_y)
+            if powerup:
+                self.powerup_list.append(powerup)
 
         for enemy in self.enemy_list:
             dx = enemy.center_x - player_x
@@ -191,6 +226,28 @@ class GameScene(arcade.View):
                 self.hit_flash = 0.2
                 if self.player.take_damage():
                     self.trigger_game_over()
+
+        for powerup in self.powerup_list:
+            dx = powerup.center_x - player_x
+            dy = powerup.center_y - player_y
+            dist = (dx * dx + dy * dy) ** 0.5
+            if dist < player_radius + 15:
+                self.apply_powerup(powerup)
+                powerup.active = False
+
+    def apply_powerup(self, powerup):
+        if powerup.power_type == PowerUp.TYPE_BULLET:
+            self.player.bullet_level = min(3, self.player.bullet_level + 1)
+            self.powerup_message = '火力强化！'
+        elif powerup.power_type == PowerUp.TYPE_SHIELD:
+            self.player.shield = min(3, self.player.shield + 1)
+            self.powerup_message = '护盾激活！'
+        elif powerup.power_type == PowerUp.TYPE_BOMB:
+            for enemy in self.enemy_list:
+                enemy.kill()
+                self.score += SCORE_PER_ENEMY
+            self.powerup_message = '炸弹！'
+        self.powerup_timer = 1.5
 
     def check_level_up(self):
         new_level = self.score // LEVEL_UP_SCORE + 1
@@ -220,6 +277,9 @@ class GameScene(arcade.View):
 
         arcade.draw_circle_filled(x, y + 5, 4, arcade.color.BLUE)
 
+        if self.player.shield > 0:
+            arcade.draw_ellipse_outline(x, y, 35, 40, arcade.color.BLUE, 2)
+
     def draw_health_bar(self):
         bar_width = 100
         bar_height = 15
@@ -239,6 +299,10 @@ class GameScene(arcade.View):
         arcade.draw_lbwh_rectangle_filled(bar_x, bar_y - bar_height/2, bar_width * health_ratio, bar_height, health_color)
         arcade.draw_text('生命', bar_x, bar_y - 25, arcade.color.WHITE, 12)
 
+    def draw_powerup_status(self):
+        arcade.draw_text(f'火力: {"★" * self.player.bullet_level}', 10, SCREEN_HEIGHT - 105, arcade.color.YELLOW, 14)
+        arcade.draw_text(f'护盾: {self.player.shield}', 10, SCREEN_HEIGHT - 125, arcade.color.BLUE, 14)
+
     def on_draw(self):
         self.clear(arcade.color.BLACK)
 
@@ -246,12 +310,21 @@ class GameScene(arcade.View):
         arcade.draw_text(f'关卡: {self.level}', 10, SCREEN_HEIGHT - 55, arcade.color.WHITE, 16)
 
         self.draw_health_bar()
+        self.draw_powerup_status()
 
         for bullet in self.bullet_list:
             bullet.draw()
 
         self.enemy_list.draw()
+
+        for powerup in self.powerup_list:
+            powerup.draw()
+
         self.draw_player()
+
+        if self.powerup_message:
+            arcade.draw_text(self.powerup_message, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2,
+                           arcade.color.GREEN, 24, anchor_x='center')
 
         if self.game_over:
             arcade.draw_text('游戏结束', SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 40, arcade.color.RED, 32, anchor_x='center')
