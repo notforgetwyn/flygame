@@ -1,18 +1,17 @@
 import arcade
-from ..constants import *
-from ..models.player import Player
-from ..models.bullet import Bullet
-from ..models.enemy import Enemy
-from ..models.enemy_factory import EnemyFactory
+from src.constants import *
+from src.models.player import Player
+from src.models.bullet import Bullet
+from src.models.enemy import Enemy
+from src.models.enemy_factory import EnemyFactory
 
 
-class GameWindow(arcade.Window):
+class GameView(arcade.View):
     def __init__(self):
-        super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
+        super().__init__()
         self.score = 0
         self.level = 1
         self.game_over = False
-        self.paused = False
 
         self.player_sprite = None
         self.bullet_list = None
@@ -34,7 +33,7 @@ class GameWindow(arcade.Window):
         self.bullet_cooldown = 0
 
     def on_update(self, delta_time):
-        if self.game_over or self.paused:
+        if self.game_over:
             return
 
         self.handle_input()
@@ -87,8 +86,7 @@ class GameWindow(arcade.Window):
                 self.score += SCORE_PER_ENEMY
 
         for enemy in self.enemy_list:
-            hit_list = arcade.check_for_collision_with_list(enemy, [self.player_sprite])
-            for _ in hit_list:
+            if arcade.check_for_collision(enemy, self.player_sprite):
                 enemy.kill()
                 if self.player_sprite.take_damage():
                     self.trigger_game_over()
@@ -103,7 +101,7 @@ class GameWindow(arcade.Window):
         self.game_over = True
 
     def on_draw(self):
-        arcade.start_render()
+        self.clear(arcade.color.BLACK)
         arcade.draw_text(f'分数: {self.score}', 10, SCREEN_HEIGHT - 30,
                          arcade.color.GOLD, 18)
         arcade.draw_text(f'关卡: {self.level}', 10, SCREEN_HEIGHT - 55,
@@ -113,7 +111,7 @@ class GameWindow(arcade.Window):
 
         self.bullet_list.draw()
         self.enemy_list.draw()
-        self.player_sprite.draw()
+        arcade.draw_sprite(self.player_sprite)
 
         if self.game_over:
             arcade.draw_text('游戏结束', SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 40,
@@ -137,7 +135,7 @@ class GameWindow(arcade.Window):
         if key == arcade.key.R and self.game_over:
             self.setup()
         elif key == arcade.key.ESCAPE:
-            from ..src.app import App
+            from src.app import App
             App.show_menu()
 
     def on_key_release(self, key, modifiers):

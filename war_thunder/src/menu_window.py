@@ -1,15 +1,15 @@
 import arcade
-from ..constants import *
+from src.constants import *
 
 
-class MenuWindow(arcade.Window):
+class MenuView(arcade.View):
     def __init__(self):
-        super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
+        super().__init__()
         self.menu_items = ['开始游戏', '继续游戏', '设置', '退出游戏']
         self.selected_index = 0
 
     def on_draw(self):
-        arcade.start_render()
+        self.clear(arcade.color.BLACK)
         arcade.draw_text('战争飞机雷霆', SCREEN_WIDTH // 2, SCREEN_HEIGHT - 120,
                          arcade.color.GOLD, 36, anchor_x='center', font_name='Times New Roman')
 
@@ -31,9 +31,7 @@ class MenuWindow(arcade.Window):
 
     def select_item(self):
         if self.selected_index == 0:
-            from .game_window import GameWindow
-            game = GameWindow()
-            game.setup()
-            game.run()
+            from src.app import App
+            App.start_game()
         elif self.selected_index == 3:
             arcade.exit()
