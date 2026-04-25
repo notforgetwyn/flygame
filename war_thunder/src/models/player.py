@@ -1,11 +1,8 @@
-import arcade
 from src.constants import *
 
 
-class Player(arcade.Sprite):
+class Player:
     def __init__(self):
-        texture = arcade.make_soft_square_texture(40, PLAYER_COLOR, 255, 255, 255)
-        super().__init__(texture)
         self.center_x = SCREEN_WIDTH // 2
         self.center_y = SCREEN_HEIGHT - 100
         self.speed = PLAYER_SPEED
