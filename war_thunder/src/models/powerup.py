@@ -1,5 +1,6 @@
 import arcade
 import random
+import math
 from src.constants import SCREEN_WIDTH, SCREEN_HEIGHT
 
 
@@ -40,8 +41,13 @@ class PowerUp:
 
     def draw_bullet_powerup(self):
         x, y = self.center_x, self.center_y
-        arcade.draw_star(x, y, 12, 5, arcade.color.YELLOW)
-        arcade.draw_text('★', x - 8, y - 10, arcade.color.YELLOW, 20)
+        points = []
+        for i in range(5):
+            angle = i * 72 - 90
+            points.append((x + 10 * math.cos(math.radians(angle)), y + 10 * math.sin(math.radians(angle))))
+            angle += 36
+            points.append((x + 5 * math.cos(math.radians(angle)), y + 5 * math.sin(math.radians(angle))))
+        arcade.draw_polygon_filled(points, arcade.color.YELLOW)
 
     def draw_shield_powerup(self):
         x, y = self.center_x, self.center_y
