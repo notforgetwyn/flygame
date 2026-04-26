@@ -24,9 +24,23 @@ class MenuScene(arcade.View):
 
     def on_draw(self):
         self.clear(arcade.color.BLACK)
+
+        # 装饰线条
+        arcade.draw_line(SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT - 140, SCREEN_WIDTH // 2 + 100, SCREEN_HEIGHT - 140, arcade.color.GOLD, 2)
+        arcade.draw_line(SCREEN_WIDTH // 2 - 80, SCREEN_HEIGHT - 142, SCREEN_WIDTH // 2 + 80, SCREEN_HEIGHT - 142, arcade.color.GOLD, 1)
+
         TextBlock('战争飞机雷霆', SCREEN_WIDTH // 2, SCREEN_HEIGHT - 100, 36, arcade.color.GOLD, 'center').draw()
+
+        # 副标题
+        TextBlock('War Thunder Lightning', SCREEN_WIDTH // 2, SCREEN_HEIGHT - 145, 14, arcade.color.GRAY, 'center').draw()
+
         self.menu.draw()
-        TextBlock('方向键/WASD 选择  Enter 执行', SCREEN_WIDTH // 2, 80, 14, arcade.color.GRAY, 'center').draw()
+
+        # 装饰线条
+        arcade.draw_line(SCREEN_WIDTH // 2 - 100, 60, SCREEN_WIDTH // 2 + 100, 60, arcade.color.GRAY, 1)
+        arcade.draw_line(SCREEN_WIDTH // 2 - 80, 62, SCREEN_WIDTH // 2 + 80, 62, arcade.color.GRAY, 1)
+
+        TextBlock('方向键/WASD 选择  Enter 执行', SCREEN_WIDTH // 2, 40, 14, arcade.color.GRAY, 'center').draw()
 
     def on_key_press(self, key, modifiers):
         if self.menu.handle_key(key):

@@ -94,6 +94,15 @@ class GameScene(arcade.View):
         self.powerup_message = ''
         self.powerup_timer = 0
 
+        # Combo系统
+        self.combo_count = 0
+        self.combo_timer = 0
+        self.combo_display = 0
+
+        # 波次奖励
+        self.wave_clear_timer = 0
+        self.wave_clear_bonus_message = ''
+
         self.player = None
         self.bullet_list = []
         self.enemy_list = None
@@ -111,6 +120,15 @@ class GameScene(arcade.View):
         self.hit_flash = 0
         self.powerup_message = ''
         self.powerup_timer = 0
+
+        # Combo系统
+        self.combo_count = 0
+        self.combo_timer = 0
+        self.combo_display = 0
+
+        # 波次奖励
+        self.wave_clear_timer = 0
+        self.wave_clear_bonus_message = ''
 
         self.player = Player()
         self.bullet_list = []
@@ -136,6 +154,15 @@ class GameScene(arcade.View):
         self.hit_flash = 0
         self.powerup_message = ''
         self.powerup_timer = 0
+
+        # Combo系统
+        self.combo_count = 0
+        self.combo_timer = 0
+        self.combo_display = 0
+
+        # 波次奖励
+        self.wave_clear_timer = 0
+        self.wave_clear_bonus_message = ''
 
         self.player = Player()
         self.player.center_x = data.get('player_x', SCREEN_WIDTH // 2)
@@ -184,6 +211,8 @@ class GameScene(arcade.View):
         self.player.update_invincible(delta_time)
         self.check_collisions()
         self.check_level_up()
+        self.update_combo(delta_time)
+        self.update_wave_clear(delta_time)
 
         if self.hit_flash > 0:
             self.hit_flash -= delta_time
@@ -191,9 +220,33 @@ class GameScene(arcade.View):
             self.powerup_timer -= delta_time
             if self.powerup_timer <= 0:
                 self.powerup_message = ''
+        if self.wave_clear_bonus_message:
+            self.wave_clear_timer -= delta_time
+            if self.wave_clear_timer <= 0:
+                self.wave_clear_bonus_message = ''
 
         if SaveService.has_save():
             SaveService.save(self.save_state())
+
+    def update_combo(self, delta_time):
+        if self.combo_timer > 0:
+            self.combo_timer -= delta_time
+            if self.combo_timer <= 0:
+                self.combo_count = 0
+                self.combo_display = 0
+
+    def update_wave_clear(self, delta_time):
+        # 检查波次清空奖励
+        if self.enemy_factory.wave_break and self.enemy_factory.wave > 1:
+            # 波次刚结束，等待下一波开始时检查奖励
+            pass
+
+    def trigger_wave_clear_bonus(self):
+        """快速清空波次奖励"""
+        bonus = WAVE_CLEAR_BONUS_BASE * self.enemy_factory.wave
+        self.score += bonus
+        self.wave_clear_bonus_message = f'波次奖励 +{bonus}'
+        self.wave_clear_timer = 2.0
 
     def handle_input(self):
         dx, dy = 0, 0
@@ -279,10 +332,6 @@ class GameScene(arcade.View):
                     bullets_to_remove.append(bullet)
                     if enemy.take_damage():
                         enemies_to_remove.append(enemy)
-                        if enemy.ai_type == Enemy.AI_BOSS:
-                            self.score += BOSS_SCORE
-                        else:
-                            self.score += SCORE_PER_ENEMY
                     break
 
         for bullet in bullets_to_remove:
@@ -291,6 +340,21 @@ class GameScene(arcade.View):
         for enemy in enemies_to_remove:
             enemy.kill()
             is_boss = enemy.ai_type == Enemy.AI_BOSS
+
+            # Combo系统: 连续击杀获得分数加成
+            self.combo_count += 1
+            self.combo_timer = COMBO_WINDOW
+            combo_multiplier = min(self.combo_count, COMBO_MAX_MULTIPLIER)
+
+            if is_boss:
+                self.score += BOSS_SCORE
+                combo_score = BOSS_SCORE // 5 * combo_multiplier
+            else:
+                combo_score = COMBO_BASE_SCORE * combo_multiplier
+                self.score += combo_score
+
+            self.combo_display = self.combo_count
+
             self.explosion_list.append(Explosion(enemy.center_x, enemy.center_y, is_boss))
             self.sound_service.play('explosion')
             if is_boss:
@@ -383,12 +447,12 @@ class GameScene(arcade.View):
             arcade.draw_ellipse_outline(x, y, 35, 40, arcade.color.BLUE, 2)
 
     def draw_health_bar(self):
-        bar_width = 100
-        bar_height = 15
+        bar_width = 80
+        bar_height = 12
         bar_x = 10
-        bar_y = SCREEN_HEIGHT - 80
+        bar_y = SCREEN_HEIGHT - 25
 
-        arcade.draw_lbwh_rectangle_filled(bar_x, bar_y - bar_height/2, bar_width, bar_height, arcade.color.GRAY)
+        arcade.draw_lbwh_rectangle_filled(bar_x, bar_y, bar_width, bar_height, arcade.color.DARK_GRAY)
 
         health_ratio = self.player.health / PLAYER_MAX_HEALTH
         if health_ratio > 0.5:
@@ -398,12 +462,13 @@ class GameScene(arcade.View):
         else:
             health_color = arcade.color.RED
 
-        arcade.draw_lbwh_rectangle_filled(bar_x, bar_y - bar_height/2, bar_width * health_ratio, bar_height, health_color)
-        arcade.draw_text('生命', bar_x, bar_y - 25, arcade.color.WHITE, 12)
+        arcade.draw_lbwh_rectangle_filled(bar_x, bar_y, bar_width * health_ratio, bar_height, health_color)
+        arcade.draw_text(f'HP {self.player.health}', bar_x + bar_width + 5, bar_y - 2, arcade.color.WHITE, 10)
 
     def draw_powerup_status(self):
-        arcade.draw_text(f'火力: {"★" * self.player.bullet_level}', SCREEN_WIDTH - 120, SCREEN_HEIGHT - 30, arcade.color.YELLOW, 14)
-        arcade.draw_text(f'护盾: {self.player.shield}', SCREEN_WIDTH - 120, SCREEN_HEIGHT - 55, arcade.color.BLUE, 14)
+        y_pos = SCREEN_HEIGHT - 20
+        arcade.draw_text(f'⚡{self.player.bullet_level}', SCREEN_WIDTH - 40, y_pos, arcade.color.YELLOW, 14)
+        arcade.draw_text(f'🛡{self.player.shield}', SCREEN_WIDTH - 70, y_pos, arcade.color.BLUE, 14)
 
     def draw_boss_health(self):
         for enemy in self.enemy_list:
@@ -414,15 +479,26 @@ class GameScene(arcade.View):
                 bar_y = enemy.center_y + 35
 
                 arcade.draw_lbwh_rectangle_filled(bar_x, bar_y, bar_width, bar_height, arcade.color.DARK_GRAY)
-                health_ratio = enemy.health / BOSS_HEALTH
+                health_ratio = enemy.health / enemy.health if enemy.health > 0 else 0
                 arcade.draw_lbwh_rectangle_filled(bar_x, bar_y, bar_width * health_ratio, bar_height, arcade.color.RED)
                 arcade.draw_text('BOSS', enemy.center_x, bar_y + 12, arcade.color.RED, 10, anchor_x='center')
 
     def on_draw(self):
         self.clear(arcade.color.BLACK)
 
+        # 分数和波次显示
         arcade.draw_text(f'分数: {self.score}', 10, SCREEN_HEIGHT - 30, arcade.color.GOLD, 18)
         arcade.draw_text(f'波次: {self.enemy_factory.wave}', 10, SCREEN_HEIGHT - 55, arcade.color.WHITE, 16)
+
+        # Combo显示
+        if self.combo_display > 1:
+            combo_color = arcade.color.ORANGE if self.combo_display < 5 else arcade.color.RED
+            arcade.draw_text(f'x{self.combo_display}', SCREEN_WIDTH - 50, SCREEN_HEIGHT - 30, combo_color, 20)
+
+        # 波次清空奖励提示
+        if self.wave_clear_bonus_message:
+            arcade.draw_text(self.wave_clear_bonus_message, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 60,
+                           arcade.color.CYAN, 20, anchor_x='center')
 
         self.draw_health_bar()
         self.draw_powerup_status()
