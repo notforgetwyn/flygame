@@ -1,7 +1,7 @@
 import arcade
 import random
 from src.constants import *
-from src.models.enemy import Enemy
+from src.models.enemy import Enemy, EnemyBullet
 from src.models.enemy_factory import EnemyFactory
 from src.models.powerup import PowerUp
 from src.models.powerup_factory import PowerUpFactory
@@ -88,8 +88,10 @@ class GameScene(arcade.View):
         self.player = Player()
         self.bullet_list = []
         self.enemy_list = arcade.SpriteList()
+        self.enemy_bullet_list = arcade.SpriteList()
         self.enemy_factory = EnemyFactory()
         self.enemy_factory.spawn_interval = settings.get('enemy_spawn_interval', ENEMY_SPAWN_INTERVAL)
+        self.enemy_factory.start_next_wave()
         self.powerup_list = []
         self.powerup_spawn_timer = 0
         self.powerup_spawn_interval = 5
@@ -113,8 +115,10 @@ class GameScene(arcade.View):
 
         self.bullet_list = []
         self.enemy_list = arcade.SpriteList()
+        self.enemy_bullet_list = arcade.SpriteList()
         self.enemy_factory = EnemyFactory()
         self.enemy_factory.spawn_interval = settings.get('enemy_spawn_interval', ENEMY_SPAWN_INTERVAL)
+        self.enemy_factory.start_next_wave()
         self.powerup_list = []
         self.powerup_spawn_timer = 0
         self.powerup_spawn_interval = 5
@@ -137,10 +141,12 @@ class GameScene(arcade.View):
 
         self.handle_input()
         self.update_bullets()
+        self.update_enemy_bullets()
         self.update_enemies()
         self.update_powerups()
         self.spawn_enemies(delta_time)
         self.spawn_powerups(delta_time)
+        self.enemy_shoot()
         self.check_collisions()
         self.check_level_up()
 
@@ -182,8 +188,16 @@ class GameScene(arcade.View):
             bullet.update()
         self.bullet_list = [b for b in self.bullet_list if b.active]
 
+    def update_enemy_bullets(self):
+        self.enemy_bullet_list.update()
+
     def update_enemies(self):
         self.enemy_list.update()
+
+    def enemy_shoot(self):
+        for enemy in self.enemy_list:
+            if enemy.can_shoot():
+                self.enemy_bullet_list.append(enemy.shoot())
 
     def update_powerups(self):
         for powerup in self.powerup_list:
@@ -219,10 +233,15 @@ class GameScene(arcade.View):
                 dx = enemy.center_x - bullet.center_x
                 dy = enemy.center_y - bullet.center_y
                 dist = (dx * dx + dy * dy) ** 0.5
-                if dist < 20:
+                hit_range = 25 if enemy.ai_type == Enemy.AI_BOSS else 20
+                if dist < hit_range:
                     bullets_to_remove.append(bullet)
-                    enemies_to_remove.append(enemy)
-                    self.score += SCORE_PER_ENEMY
+                    if enemy.take_damage():
+                        enemies_to_remove.append(enemy)
+                        if enemy.ai_type == Enemy.AI_BOSS:
+                            self.score += BOSS_SCORE
+                        else:
+                            self.score += SCORE_PER_ENEMY
                     break
 
         for bullet in bullets_to_remove:
@@ -230,15 +249,17 @@ class GameScene(arcade.View):
 
         for enemy in enemies_to_remove:
             enemy.kill()
-            powerup = PowerUpFactory.maybe_create(enemy.center_x, enemy.center_y)
-            if powerup:
-                self.powerup_list.append(powerup)
+            if enemy.ai_type != Enemy.AI_BOSS:
+                powerup = PowerUpFactory.maybe_create(enemy.center_x, enemy.center_y)
+                if powerup:
+                    self.powerup_list.append(powerup)
 
         for enemy in self.enemy_list:
             dx = enemy.center_x - player_x
             dy = enemy.center_y - player_y
             dist = (dx * dx + dy * dy) ** 0.5
-            if dist < player_radius + 17:
+            hit_range = player_radius + 25 if enemy.ai_type == Enemy.AI_BOSS else player_radius + 17
+            if dist < hit_range:
                 enemy.kill()
                 self.hit_flash = 0.2
                 if self.player.take_damage():
@@ -251,6 +272,16 @@ class GameScene(arcade.View):
             if dist < player_radius + 15:
                 self.apply_powerup(powerup)
                 powerup.active = False
+
+        for bullet in self.enemy_bullet_list:
+            dx = bullet.center_x - player_x
+            dy = bullet.center_y - player_y
+            dist = (dx * dx + dy * dy) ** 0.5
+            if dist < player_radius + 8:
+                bullet.kill()
+                self.hit_flash = 0.2
+                if self.player.take_damage():
+                    self.trigger_game_over()
 
     def apply_powerup(self, powerup):
         if powerup.power_type == PowerUp.TYPE_BULLET:
@@ -320,18 +351,33 @@ class GameScene(arcade.View):
         arcade.draw_text(f'火力: {"★" * self.player.bullet_level}', SCREEN_WIDTH - 120, SCREEN_HEIGHT - 30, arcade.color.YELLOW, 14)
         arcade.draw_text(f'护盾: {self.player.shield}', SCREEN_WIDTH - 120, SCREEN_HEIGHT - 55, arcade.color.BLUE, 14)
 
+    def draw_boss_health(self):
+        for enemy in self.enemy_list:
+            if enemy.ai_type == Enemy.AI_BOSS:
+                bar_width = 80
+                bar_height = 8
+                bar_x = enemy.center_x - bar_width // 2
+                bar_y = enemy.center_y + 35
+
+                arcade.draw_lbwh_rectangle_filled(bar_x, bar_y, bar_width, bar_height, arcade.color.DARK_GRAY)
+                health_ratio = enemy.health / BOSS_HEALTH
+                arcade.draw_lbwh_rectangle_filled(bar_x, bar_y, bar_width * health_ratio, bar_height, arcade.color.RED)
+                arcade.draw_text('BOSS', enemy.center_x, bar_y + 12, arcade.color.RED, 10, anchor_x='center')
+
     def on_draw(self):
         self.clear(arcade.color.BLACK)
 
         arcade.draw_text(f'分数: {self.score}', 10, SCREEN_HEIGHT - 30, arcade.color.GOLD, 18)
-        arcade.draw_text(f'关卡: {self.level}', 10, SCREEN_HEIGHT - 55, arcade.color.WHITE, 16)
+        arcade.draw_text(f'波次: {self.enemy_factory.wave}', 10, SCREEN_HEIGHT - 55, arcade.color.WHITE, 16)
 
         self.draw_health_bar()
         self.draw_powerup_status()
+        self.draw_boss_health()
 
         for bullet in self.bullet_list:
             bullet.draw()
 
+        self.enemy_bullet_list.draw()
         self.enemy_list.draw()
 
         for powerup in self.powerup_list:
