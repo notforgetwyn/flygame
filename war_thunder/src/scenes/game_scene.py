@@ -37,6 +37,8 @@ class Player:
         self.health = PLAYER_MAX_HEALTH
         self.shield = 0
         self.bullet_level = 1
+        self.invincible = 0
+        self.blink_timer = 0
 
     def move(self, dx, dy):
         self.center_x += dx * self.speed
@@ -45,11 +47,32 @@ class Player:
         self.center_y = max(20, min(SCREEN_HEIGHT - 20, self.center_y))
 
     def take_damage(self):
+        if self.invincible > 0:
+            return False
         if self.shield > 0:
             self.shield -= 1
+            self.start_invincible()
             return False
         self.health -= 1
+        self.start_invincible()
         return self.health <= 0
+
+    def start_invincible(self):
+        self.invincible = 2.0
+        self.blink_timer = 0
+
+    def update_invincible(self, delta_time):
+        if self.invincible > 0:
+            self.invincible -= delta_time
+            self.blink_timer += delta_time
+        else:
+            self.invincible = 0
+            self.blink_timer = 0
+
+    def is_visible(self):
+        if self.invincible <= 0:
+            return True
+        return self.blink_timer % 0.15 < 0.075
 
     def reset(self):
         self.center_x = SCREEN_WIDTH // 2
@@ -57,6 +80,8 @@ class Player:
         self.health = PLAYER_MAX_HEALTH
         self.shield = 0
         self.bullet_level = 1
+        self.invincible = 0
+        self.blink_timer = 0
 
 
 class GameScene(arcade.View):
@@ -155,6 +180,7 @@ class GameScene(arcade.View):
         self.spawn_enemies(delta_time)
         self.spawn_powerups(delta_time)
         self.enemy_shoot()
+        self.player.update_invincible(delta_time)
         self.check_collisions()
         self.check_level_up()
 
@@ -331,6 +357,9 @@ class GameScene(arcade.View):
         self.sound_service.stop_music()
 
     def draw_player(self):
+        if not self.player.is_visible():
+            return
+
         x, y = self.player.center_x, self.player.center_y
         color = arcade.color.RED if self.hit_flash > 0 else arcade.color.CYAN
 
