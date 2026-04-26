@@ -100,6 +100,7 @@ class GameScene(arcade.View):
         self.bullet_cooldown = 0
         self.explosion_list = []
         self.sound_service = SoundService()
+        self.sound_service.play_music(looping=True)
 
     def load_state(self, data):
         settings = SettingsService()
@@ -327,6 +328,7 @@ class GameScene(arcade.View):
         self.game_over = True
         SaveService.clear()
         self.sound_service.play('game_over')
+        self.sound_service.stop_music()
 
     def draw_player(self):
         x, y = self.player.center_x, self.player.center_y
@@ -433,6 +435,7 @@ class GameScene(arcade.View):
         if key == arcade.key.R and self.game_over:
             self.setup()
         elif key == arcade.key.ESCAPE:
+            self.sound_service.stop_music()
             from src.scenes.menu_scene import MenuScene
             self.window.show_view(MenuScene())
 

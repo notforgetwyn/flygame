@@ -3,12 +3,20 @@ from src.constants import SCREEN_WIDTH, SCREEN_HEIGHT, arcade
 from src.ui.text import TextBlock
 from src.ui.menu_list import MenuList
 from src.core.save_service import SaveService
+from src.core.sound_service import SoundService
 
 
 class MenuScene(arcade.View):
     def __init__(self):
         super().__init__()
         self.menu = MenuList(['开始游戏', '继续游戏', '设置', '退出游戏'], SCREEN_HEIGHT - 200)
+        self.sound_service = SoundService()
+        self.sound_service.play_music(looping=True)
+
+    def on_show_view(self):
+        """当视图显示时"""
+        if self.sound_service:
+            self.sound_service.resume_music()
 
     def on_draw(self):
         self.clear(arcade.color.BLACK)
