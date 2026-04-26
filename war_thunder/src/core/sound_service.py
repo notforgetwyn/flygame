@@ -1,6 +1,8 @@
 import wave
 import struct
 import arcade
+import tempfile
+import os
 from src.core.settings_service import SettingsService
 
 
@@ -19,6 +21,7 @@ class SoundService:
         self._initialized = True
         self.volume = SettingsService().get('sound_volume', 0.5)
         self.sounds = {}
+        self.temp_files = []
         self._generate_all_sounds()
 
     def _generate_wav_data(self, frequency, duration, volume=0.5, sample_rate=22050):
@@ -50,7 +53,11 @@ class SoundService:
         }
         for name, (freq, dur, vol) in sound_configs.items():
             wav_data = self._generate_wav_data(freq, dur, vol)
-            self.sounds[name] = arcade.Sound(wav_data)
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
+            temp_file.write(wav_data)
+            temp_file.close()
+            self.temp_files.append(temp_file.name)
+            self.sounds[name] = arcade.Sound(temp_file.name)
 
     def play(self, sound_name):
         if sound_name in self.sounds:
