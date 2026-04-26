@@ -1,4 +1,5 @@
 import arcade
+import random
 from src.constants import *
 from src.models.enemy import Enemy
 from src.models.enemy_factory import EnemyFactory
