@@ -11,12 +11,16 @@ class MenuScene(arcade.View):
         super().__init__()
         self.menu = MenuList(['开始游戏', '继续游戏', '设置', '退出游戏'], SCREEN_HEIGHT - 200)
         self.sound_service = SoundService()
-        self.sound_service.play_music(looping=True)
+        if not self.sound_service._music_player:
+            self.sound_service.play_music(looping=True)
 
     def on_show_view(self):
         """当视图显示时"""
-        if self.sound_service:
-            self.sound_service.resume_music()
+        try:
+            if self.sound_service and self.sound_service._music_player:
+                self.sound_service.resume_music()
+        except:
+            pass
 
     def on_draw(self):
         self.clear(arcade.color.BLACK)

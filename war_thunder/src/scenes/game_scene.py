@@ -125,7 +125,8 @@ class GameScene(arcade.View):
         self.bullet_cooldown = 0
         self.explosion_list = []
         self.sound_service = SoundService()
-        self.sound_service.play_music(looping=True)
+        if not self.sound_service._music_player:
+            self.sound_service.play_music(looping=True)
 
     def load_state(self, data):
         settings = SettingsService()
