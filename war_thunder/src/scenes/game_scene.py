@@ -90,6 +90,8 @@ class GameScene(arcade.View):
         self.enemy_factory = EnemyFactory()
         self.enemy_factory.spawn_interval = settings.get('enemy_spawn_interval', ENEMY_SPAWN_INTERVAL)
         self.powerup_list = []
+        self.powerup_spawn_timer = 0
+        self.powerup_spawn_interval = 5
         self.bullet_cooldown = 0
 
     def load_state(self, data):
@@ -113,6 +115,8 @@ class GameScene(arcade.View):
         self.enemy_factory = EnemyFactory()
         self.enemy_factory.spawn_interval = settings.get('enemy_spawn_interval', ENEMY_SPAWN_INTERVAL)
         self.powerup_list = []
+        self.powerup_spawn_timer = 0
+        self.powerup_spawn_interval = 5
         self.bullet_cooldown = 0
 
     def save_state(self):
@@ -135,6 +139,7 @@ class GameScene(arcade.View):
         self.update_enemies()
         self.update_powerups()
         self.spawn_enemies(delta_time)
+        self.spawn_powerups(delta_time)
         self.check_collisions()
         self.check_level_up()
 
@@ -188,6 +193,17 @@ class GameScene(arcade.View):
         enemy = self.enemy_factory.update(delta_time)
         if enemy:
             self.enemy_list.append(enemy)
+
+    def spawn_powerups(self, delta_time):
+        self.powerup_spawn_timer += delta_time
+        if self.powerup_spawn_timer >= self.powerup_spawn_interval:
+            self.powerup_spawn_timer = 0
+            powerup = PowerUpFactory.maybe_create(
+                random.randint(30, SCREEN_WIDTH - 30),
+                SCREEN_HEIGHT + 20
+            )
+            if powerup:
+                self.powerup_list.append(powerup)
 
     def check_collisions(self):
         player_x = self.player.center_x
@@ -300,8 +316,8 @@ class GameScene(arcade.View):
         arcade.draw_text('生命', bar_x, bar_y - 25, arcade.color.WHITE, 12)
 
     def draw_powerup_status(self):
-        arcade.draw_text(f'火力: {"★" * self.player.bullet_level}', 10, SCREEN_HEIGHT - 105, arcade.color.YELLOW, 14)
-        arcade.draw_text(f'护盾: {self.player.shield}', 10, SCREEN_HEIGHT - 125, arcade.color.BLUE, 14)
+        arcade.draw_text(f'火力: {"★" * self.player.bullet_level}', SCREEN_WIDTH - 120, SCREEN_HEIGHT - 30, arcade.color.YELLOW, 14)
+        arcade.draw_text(f'护盾: {self.player.shield}', SCREEN_WIDTH - 120, SCREEN_HEIGHT - 55, arcade.color.BLUE, 14)
 
     def on_draw(self):
         self.clear(arcade.color.BLACK)
