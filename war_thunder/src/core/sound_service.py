@@ -149,32 +149,47 @@ class SoundService:
     def play_music(self, looping=True):
         """播放背景音乐"""
         self._music_looping = looping
-        if self._music_player:
-            self._music_player.stop()
+        if self._music_player is not None and hasattr(self._music_player, 'stop'):
+            try:
+                self._music_player.stop()
+            except:
+                pass
         music_stream = self._create_music_stream()
         self._music_player = music_stream.play(volume=self.music_volume, loop=looping)
 
     def stop_music(self):
         """停止背景音乐"""
-        if self._music_player:
-            self._music_player.stop()
+        if self._music_player is not None and hasattr(self._music_player, 'stop'):
+            try:
+                self._music_player.stop()
+            except:
+                pass
             self._music_player = None
 
     def pause_music(self):
         """暂停背景音乐"""
-        if self._music_player:
-            self._music_player.pause()
+        if self._music_player is not None and hasattr(self._music_player, 'pause'):
+            try:
+                self._music_player.pause()
+            except:
+                pass
 
     def resume_music(self):
         """恢复背景音乐"""
-        if self._music_player and self._music_player.paused:
-            self._music_player.resume()
+        if self._music_player is not None:
+            try:
+                self._music_player.play()
+            except:
+                pass
 
     def set_music_volume(self, volume):
         """设置背景音乐音量"""
         self.music_volume = volume
-        if self._music_player:
-            self._music_player.volume = volume
+        if self._music_player is not None and hasattr(self._music_player, 'volume'):
+            try:
+                self._music_player.volume = volume
+            except:
+                pass
 
     def play(self, sound_name):
         if sound_name in self.sounds:
