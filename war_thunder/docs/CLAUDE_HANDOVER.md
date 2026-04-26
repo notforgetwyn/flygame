@@ -31,9 +31,60 @@ powershell -Command "Start-Process -FilePath 'D:\py_3.11\python.exe' -ArgumentLi
 - 道具图标：火力(黄色星)、护盾(蓝色盾)、炸弹(红色雷)
 
 ### 阶段4：敌机AI与关卡系统
-- 4种敌机AI：NORMAL、HOMING、SIDE_ATTACK、BOSS
-- 波次系统：每波数量递增（3 + wave*2），波次间2秒停顿
-- Boss：每5波出现，10点生命，可发射子弹，击败得500分
+
+**当前阶段目标**：
+- 实现敌机AI行为（追击、包围）
+- 波次系统
+- Boss战
+
+**本阶段完成功能**：
+- 新增敌机AI类型：NORMAL（直线下落）、HOMING（追踪玩家）、SIDE_ATTACK（横向包抄）、BOSS
+- 波次系统：每波敌机数量 = 3 + 波次×2，波次间2秒停顿
+- Boss战：每5波出现，10点生命，可发射子弹攻击玩家，击败得500分
+- 敌机子弹系统：Boss发射橙色子弹
+
+**本阶段页面与UI完成情况**：
+
+游戏页 `GameScene`：
+- HUD新增波次显示（左上角，原关卡位置改为波次）
+- Boss头顶显示红色血条
+- 不同敌机类型有不同移动行为
+
+**本阶段完成设计**：
+- Enemy类增加ai_type属性，根据类型执行不同update逻辑
+- EnemyFactory增加波次管理：start_next_wave()、wave_break计时器
+- Boss使用独立绘制方法（红色三角形），普通敌机使用圆形纹理
+- 新增EnemyBullet类处理Boss子弹
+
+**本阶段数据流设计**：
+- EnemyFactory.update()：管理波次和敌机生成，返回None时进入波次停顿
+- Enemy.update()：根据ai_type调用update_normal/homing/side/boss
+- Enemy.can_shoot()：Boss且bullet_cooldown<=0时可射击
+- GameScene.enemy_shoot()：遍历enemies调用can_shoot()和shoot()
+- GameScene.check_collisions()：Boss需要多次命中（10点生命），普通敌机1点
+
+**本阶段核心业务场景完成进度**：
+- 敌机AI业务场景：已完成（NORMAL、HOMING、SIDE_ATTACK、BOSS四种行为）
+- 波次系统业务场景：已完成（数量递增、波次停顿）
+- Boss战业务场景：已完成（出现、射击、击杀计分）
+
+**涉及文件**：
+- `war_thunder/src/models/enemy.py`
+- `war_thunder/src/models/enemy_factory.py`
+- `war_thunder/src/constants.py`
+- `war_thunder/src/scenes/game_scene.py`
+
+**验证情况**：
+- 语法检查通过
+- 游戏可正常启动运行
+- 不同敌机类型移动行为正确
+- Boss出现和射击正常
+- 波次递增正常
+
+**下一阶段建议**：
+- 阶段5：音效与特效
+- 增加爆炸效果
+- 增加背景音乐和音效
 
 ## 核心文件
 
