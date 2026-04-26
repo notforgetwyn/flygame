@@ -1,2 +1,3 @@
 @echo off
-powershell -Command "Start-Process -FilePath 'D:\py_3.11\python.exe' -ArgumentList '-m src.app' -WorkingDirectory '%CD%'"
+cd /d %~dp0
+D:\py_3.11\python.exe main.py

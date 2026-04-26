@@ -5,8 +5,10 @@ from src.models.enemy import Enemy, EnemyBullet
 from src.models.enemy_factory import EnemyFactory
 from src.models.powerup import PowerUp
 from src.models.powerup_factory import PowerUpFactory
+from src.models.explosion import Explosion
 from src.core.save_service import SaveService
 from src.core.settings_service import SettingsService
+from src.core.sound_service import SoundService
 
 
 class Bullet:
@@ -96,6 +98,8 @@ class GameScene(arcade.View):
         self.powerup_spawn_timer = 0
         self.powerup_spawn_interval = 5
         self.bullet_cooldown = 0
+        self.explosion_list = []
+        self.sound_service = SoundService()
 
     def load_state(self, data):
         settings = SettingsService()
@@ -123,6 +127,8 @@ class GameScene(arcade.View):
         self.powerup_spawn_timer = 0
         self.powerup_spawn_interval = 5
         self.bullet_cooldown = 0
+        self.explosion_list = []
+        self.sound_service = SoundService()
 
     def save_state(self):
         return {
@@ -144,6 +150,7 @@ class GameScene(arcade.View):
         self.update_enemy_bullets()
         self.update_enemies()
         self.update_powerups()
+        self.update_explosions()
         self.spawn_enemies(delta_time)
         self.spawn_powerups(delta_time)
         self.enemy_shoot()
@@ -182,6 +189,7 @@ class GameScene(arcade.View):
         self.bullet_cooldown = BULLET_COOLDOWN / self.player.bullet_level
         bullet = Bullet(self.player.center_x, self.player.center_y + 20)
         self.bullet_list.append(bullet)
+        self.sound_service.play('shoot')
 
     def update_bullets(self):
         for bullet in self.bullet_list:
@@ -203,6 +211,11 @@ class GameScene(arcade.View):
         for powerup in self.powerup_list:
             powerup.update()
         self.powerup_list = [p for p in self.powerup_list if p.active]
+
+    def update_explosions(self):
+        for explosion in self.explosion_list:
+            explosion.update(1/60)
+        self.explosion_list = [e for e in self.explosion_list if e.active]
 
     def spawn_enemies(self, delta_time):
         enemy = self.enemy_factory.update(delta_time)
@@ -249,7 +262,12 @@ class GameScene(arcade.View):
 
         for enemy in enemies_to_remove:
             enemy.kill()
-            if enemy.ai_type != Enemy.AI_BOSS:
+            is_boss = enemy.ai_type == Enemy.AI_BOSS
+            self.explosion_list.append(Explosion(enemy.center_x, enemy.center_y, is_boss))
+            self.sound_service.play('explosion')
+            if is_boss:
+                self.sound_service.play('game_over')
+            if not is_boss:
                 powerup = PowerUpFactory.maybe_create(enemy.center_x, enemy.center_y)
                 if powerup:
                     self.powerup_list.append(powerup)
@@ -262,6 +280,7 @@ class GameScene(arcade.View):
             if dist < hit_range:
                 enemy.kill()
                 self.hit_flash = 0.2
+                self.sound_service.play('hit')
                 if self.player.take_damage():
                     self.trigger_game_over()
 
@@ -280,6 +299,7 @@ class GameScene(arcade.View):
             if dist < player_radius + 8:
                 bullet.kill()
                 self.hit_flash = 0.2
+                self.sound_service.play('hit')
                 if self.player.take_damage():
                     self.trigger_game_over()
 
@@ -296,6 +316,7 @@ class GameScene(arcade.View):
                 self.score += SCORE_PER_ENEMY
             self.powerup_message = '炸弹！'
         self.powerup_timer = 1.5
+        self.sound_service.play('powerup')
 
     def check_level_up(self):
         new_level = self.score // LEVEL_UP_SCORE + 1
@@ -305,6 +326,7 @@ class GameScene(arcade.View):
     def trigger_game_over(self):
         self.game_over = True
         SaveService.clear()
+        self.sound_service.play('game_over')
 
     def draw_player(self):
         x, y = self.player.center_x, self.player.center_y
@@ -382,6 +404,9 @@ class GameScene(arcade.View):
 
         for powerup in self.powerup_list:
             powerup.draw()
+
+        for explosion in self.explosion_list:
+            explosion.draw()
 
         self.draw_player()
 
